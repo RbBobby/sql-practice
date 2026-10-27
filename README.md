@@ -6,25 +6,62 @@
 
 ## 1. Как развернуть локально
 
-PostgreSQL — сервер базы данных. `psql` — его консольный клиент. Отдельно устанавливать клиент не нужно: он уже есть внутри контейнера.
+PostgreSQL — сервер базы данных. Он запускается в Docker, отдельно ставить PostgreSQL не нужно. `psql` — его консольный клиент, он уже есть внутри контейнера. Ниже установка с нуля на macOS: сначала Docker, затем сам тренажёр.
 
-Нужен работающий Docker с Docker Compose. Если Docker отсутствует, установи [Docker Desktop для Mac](https://docs.docker.com/desktop/setup/install/mac-install/), выбрав версию под процессор, и запусти приложение. Если уже используешь Colima с Docker, этого достаточно; второй Docker не нужен.
+На компьютере должен работать один сервер Docker. Colima и Docker Desktop вместе не запускай: клиент `docker` подключается только к одному из них.
 
-### Состояние запуска на этом компьютере
+### Установить Docker через Colima
 
-При подготовке комплекта Docker вернул `no space left on device` из своего виртуального диска. Даже создание контейнера из уже имеющегося `postgres:16-alpine` завершилось этой ошибкой. **Сервер этого тренажёра пока не запущен, импорт не выполнен.** Конфигурация Compose прошла проверку, но запросы и контрольные ответы пока не проверены выполнением в PostgreSQL.
+Этот вариант не требует Docker Desktop. Colima поднимает виртуальную машину, в которой работает Docker. Команды `docker` и `docker compose` ставятся отдельно и обращаются к ней.
 
-На основном диске macOS свободное место есть; ограничение относится к виртуальному диску используемой Colima. Для запуска нужно освободить место именно там либо увеличить диск Colima. Не удаляй незнакомые Docker volumes: в них могут быть данные других проектов. После устранения нехватки места выполни обычную команду запуска ниже. Учебный набор будет импортирован автоматически.
-
-В терминале:
+Если Homebrew ещё нет, установи его и следуй подсказке в конце установки про `PATH`:
 
 ```bash
-cd /Users/alexandr/Documents/ChatGPT/Data_bases/sql-practice
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Дальше поставь клиент Docker, Compose и Colima, затем запусти виртуальную машину:
+
+```bash
+brew install docker docker-compose colima
+colima start --cpu 2 --memory 4 --disk 20
+docker info
+```
+
+`docker info` должен показать блок `Server`, а не ошибку про docker daemon. Диск `20` — размер диска виртуальной машины в гигабайтах, не диска Mac. Учебной базе этого хватает. Если Colima уже создана с другим диском, повторный `colima start` старые параметры не меняет.
+
+### Либо установить Docker Desktop
+
+Вместо Colima можно поставить [Docker Desktop для Mac](https://docs.docker.com/desktop/setup/install/mac-install/). Скачай версию под свой процессор, открой скачанный файл и перенеси Docker в «Программы». Запусти Docker и дождись статуса, что сервер работает. После этого в терминале тоже должна проходить команда `docker info`.
+
+Через Homebrew тот же вариант ставится так:
+
+```bash
+brew install --cask docker
+open -a Docker
+```
+
+### Скачать тренажёр и запустить базу
+
+```bash
+git clone https://github.com/RbBobby/sql-practice.git
+cd sql-practice
 docker compose up -d --wait
 docker compose ps
 ```
 
-При первом запуске Docker скачает образ PostgreSQL 16 (Alpine), создаст базу `interview_lab` и автоматически выполнит `init/01_data.sql`. Дождись статуса `healthy`. Порт открыт только на этом компьютере. Учебный пароль находится в `compose.yaml`.
+Если папка `sql-practice` уже есть, `git clone` не нужен: открой терминал в этой папке и выполни две команды `docker compose`.
+
+При первом запуске Docker скачает образ PostgreSQL 16 (Alpine), создаст базу `interview_lab` и автоматически выполнит `init/01_data.sql`. Дождись статуса `healthy`. Порт `55432` открыт только на этом компьютере. Это не сайт: адрес `http://127.0.0.1:55432` в браузере открывать не нужно, браузер покажет пустую страницу. Учебный пароль находится в `compose.yaml`.
+
+Если `docker compose` пишет `Cannot connect to the Docker daemon`, сервер Docker не запущен. Для Colima перезапусти машину. Сообщение `already running` при мёртвой машине как раз лечится принудительной остановкой:
+
+```bash
+colima stop --force
+colima start
+```
+
+Для Docker Desktop открой приложение и дождись, пока оно запустится. Ошибки самой базы смотри командой `docker compose logs db`. Если порт `55432` занят, поменяй в `compose.yaml` только левое число, например на `55433`, и используй новый порт в клиенте.
 
 Подключиться через терминал:
 
@@ -56,7 +93,9 @@ SELECT * FROM cinema.categories ORDER BY category_id;
 | Password | `practice_local_only` |
 | SSL | Для этого локального стенда отключить |
 
-Открывай SQL-редактор именно для базы `interview_lab`. В запросах используй полные имена таблиц: `cinema.films`, `billing.users`.
+Графический клиент для этих параметров — [DBeaver Community](https://dbeaver.io/download/). Платная редакция не нужна. После установки создай подключение PostgreSQL и впиши таблицу выше. В поле SSL выбери `disable`.
+
+Открывай SQL-редактор именно для базы `interview_lab`. Вверху редактора в списке баз должна быть выбрана `interview_lab`, не служебная база `postgres`. В запросах используй полные имена таблиц: `cinema.films`, `billing.users`. Схема `cinema` — это не отдельная база, поэтому запрос `SELECT * FROM cinema` завершится ошибкой. Левая панель DBeaver возвращается через **Window → Show View → Database Navigator**. Если панели нет в коротком списке, открой **Other…** и найди `Database Navigator`. Сбросить расположение окон: **Window → Perspective → Reset Perspective**.
 
 Остановка с сохранением данных:
 
@@ -70,7 +109,13 @@ docker compose stop
 docker compose up -d --wait
 ```
 
-Если порт занят, поменяй в `compose.yaml` только `55432`, например на `55433`, и используй новый порт в клиенте. При ошибке соединения с Docker запусти Docker Desktop или свою Colima. Посмотреть ошибки сервера: `docker compose logs db`.
+Остановить саму виртуальную машину Colima, когда тренажёр больше не нужен:
+
+```bash
+colima stop
+```
+
+Следующий запуск снова начинается с `colima start`, затем `docker compose up -d --wait`. Docker Desktop вместо этого просто оставляй запущенным или выходи из приложения.
 
 ## 2. Как импортировать учебную базу
 
